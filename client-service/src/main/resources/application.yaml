@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: client-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/db_client_mgmt
+    username: client_admin
+    password: password123
+    driver-class-name: org.postgresql.Driver
+  # jpa:
+  #   database-platform: org.hibernate.dialect.PostgreSQLDialect
+  #   hibernate:
+  #     ddl-auto: update
+  #   properties:
+  #     hibernate:
+  #       dialect: org.hibernate.dialect.PostgreSQLDialect
+  #       format_sql: true
+  #   show-sql: false
+  # sql:
+  #   init:
+  #     mode: always
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    org.hibernate: WARN
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://client-db:5432/db_client_mgmt
+    username: client_admin
+    password: password123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
+
+server:
+  port: 8080
