@@ -1,0 +1,70 @@
+services:
+  client-db:
+    image: postgres:15-alpine # Use a specific version for stability
+    container_name: client-db # Name the container for easier reference
+    environment: 
+      POSTGRES_DB: db_client_mgmt # Database name
+      POSTGRES_USER: client_admin # Database user
+      POSTGRES_PASSWORD: password123 # Database password
+    ports:
+      - "127.0.0.1:5433:5432" ## Map to localhost for easier access from host machine
+    networks:
+      - platform-network 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U client_admin -d db_client_mgmt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  client-service:
+    build: ./client-service
+    container_name: client-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://client-db:5432/db_client_mgmt
+      SPRING_DATASOURCE_USERNAME: client_admin
+      SPRING_DATASOURCE_PASSWORD: password123
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "127.0.0.1:8080:8080" # Map to localhost for easier access from host machine
+    depends_on:
+      client-db:
+        condition: service_healthy # Ensure client-service starts only after client-db is healthy
+    networks:
+      - platform-network
+
+  kong:
+    image: kong:3.4
+    container_name: kong-gateway # Name the container for easier reference
+    user: "root" # Run as root to ensure proper permissions for mounted volumes
+    volumes:
+      - ./infrastructure/kong:/usr/local/kong/declarative # Mount the local directory for Kong's declarative configuration
+    environment:
+      KONG_DATABASE: "off" # Use DB-less mode for simplicity
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml # Point to the mounted configuration file
+      KONG_PROXY_LISTEN: 0.0.0.0:8000 # Listen on all interfaces for proxy traffic
+      KONG_LOG_LEVEL: info # Set log level to info for better visibility of gateway operations
+    ports:
+      - "80:8000" # Map Kong's proxy port to host port 80 for easy access to the API gateway
+      - "8001:8001" # Map Kong's admin API port to host port 8001 for management and monitoring
+
+    depends_on:
+      client-service:
+        condition: service_started # Ensure Kong starts after client-service is up, but it doesn't need to wait for it to be healthy since Kong can handle service unavailability gracefully
+    networks:
+      - platform-network
+
+  client-frontend:
+    build:
+      context: ./client-frontend
+      dockerfile: Dockerfile
+    container_name: client-frontend
+    ports:
+      - "127.0.0.1:5173:80" # Map to localhost for easier access from host machine
+    depends_on:
+      - client-service # Ensure frontend starts after client-service is up, but it doesn't need to wait for it to be healthy since the frontend can handle service unavailability gracefully
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    driver: bridge
